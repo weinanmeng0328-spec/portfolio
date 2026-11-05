@@ -1,14 +1,12 @@
 name: Publish portfolio
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Release containing portfolio-site.zip
+        description: Base portfolio-v1 or a release containing portfolio-update.zip
         required: true
-        default: portfolio-v1
+        default: portfolio-cv-20261105
         type: string
 
 permissions:
@@ -27,16 +25,26 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download the website release package
+      - name: Download the original website release package
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag || 'portfolio-v1' }}
         run: |
           mkdir -p "$RUNNER_TEMP/portfolio-release"
-          gh release download "$RELEASE_TAG" --pattern portfolio-site.zip --dir "$RUNNER_TEMP/portfolio-release"
+          gh release download portfolio-v1 --pattern portfolio-site.zip --dir "$RUNNER_TEMP/portfolio-release"
           unzip -q "$RUNNER_TEMP/portfolio-release/portfolio-site.zip" -d _site
           test -s _site/index.html
+
+      - name: Apply the selected cumulative update
+        if: inputs.release_tag != 'portfolio-v1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPDATE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release download "$UPDATE_TAG" --pattern portfolio-update.zip --dir "$RUNNER_TEMP/portfolio-release"
+          unzip -oq "$RUNNER_TEMP/portfolio-release/portfolio-update.zip" -d _site
+          test -s _site/assets/materials/weinan-meng-cv.pdf
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
