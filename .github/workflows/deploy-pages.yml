@@ -1,0 +1,52 @@
+name: Publish portfolio
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release containing portfolio-site.zip
+        required: true
+        default: portfolio-v1
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download the website release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag || 'portfolio-v1' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/portfolio-release"
+          gh release download "$RELEASE_TAG" --pattern portfolio-site.zip --dir "$RUNNER_TEMP/portfolio-release"
+          unzip -q "$RUNNER_TEMP/portfolio-release/portfolio-site.zip" -d _site
+          test -s _site/index.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the static website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+          retention-days: 1
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
